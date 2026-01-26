@@ -1,3 +1,6 @@
 requests
 python-dotenv
 urllib3
+openai
+azure-storage-blob
+azure-search-documents

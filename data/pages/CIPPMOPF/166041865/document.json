@@ -1,0 +1,170 @@
+{
+  "metadata": {
+    "page_id": "166041865",
+    "title": "Agile - Scrum Roles & Responsibilities",
+    "space_key": "CIPPMOPF",
+    "version": 1,
+    "last_modified": "2024-06-07T14:39:03.458Z",
+    "url": "https://eaton-corp.atlassian.net/wiki/wiki/spaces/CIPPMOPF/pages/166041865",
+    "extracted_at": "2026-01-26T16:57:18.697001Z",
+    "total_blocks": 16,
+    "total_images": 0,
+    "attachment_images": 0,
+    "external_images": 0,
+    "attachments_count": 0,
+    "images_described": true,
+    "description_tokens_used": 0,
+    "uploaded_to_blob": true,
+    "blob_container_media": "confluence-media",
+    "blob_container_rag": "confluence-rag",
+    "media_base_path": "CIPPMOPF/166041865/v1"
+  },
+  "content_blocks": [
+    {
+      "type": "heading",
+      "level": 3,
+      "content": "Scrum Team",
+      "index": 0
+    },
+    {
+      "type": "text",
+      "content": "The fundamental unit of Scrum is a small team of people, a Scrum Team. The Scrum Team consists of one Scrum Master, one Product Owner, and Developers (Developers & Testers). Within a Scrum Team, there are no sub-teams or hierarchies. It is a cohesive unit of professionals focused on one objective at a time, the Product Goal. Scrum Teams are cross-functional, meaning the members have all the skills necessary to create value each Sprint. They are also self-managing, meaning they internally decide who does what, when, and how. The Scrum Team is small enough to remain nimble and large enough to complete significant work within a Sprint, typically 10 or fewer people. In general, we have found that smaller teams communicate better and are more productive. If Scrum Teams become too large, they should consider reorganizing into multiple cohesive Scrum Teams, each focused on the same product. Therefore, they should share the same Product Goal, Product Backlog, and Product Owner. The Scrum Team is responsible for all product-related activities from stakeholder collaboration, verification, maintenance, operation, experimentation, research and development, and anything else that might be required. They are structured and empowered by the organization to manage their own work. Working in Sprints at a sustainable pace improves the Scrum Team&rsquo;s focus and consistency. The entire Scrum Team is accountable for creating a valuable, useful Increment every Sprint. Scrum defines three specific accountabilities within the Scrum Team: the Developers, the Product Owner, and the Scrum Master.",
+      "index": 1
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "content": "Developers",
+      "index": 2
+    },
+    {
+      "type": "text",
+      "content": "Developers are the people in the Scrum Team that are committed to creating any aspect of a usable Increment each Sprint. The specific skills needed by the Developers are often broad and will vary with the domain of work. However, the Developers are always accountable for:",
+      "index": 3
+    },
+    {
+      "type": "list",
+      "list_type": "unordered",
+      "items": [
+        "Creating a plan for the Sprint with the help of the product owner and scrum master adhering to the Definition of Ready, the Sprint Backlog;",
+        "Instilling quality by adhering to a Definition of Done;",
+        "Adapting their plan each day toward the Sprint Goal; and,",
+        "Holding each other accountable as professionals."
+      ],
+      "index": 4
+    },
+    {
+      "type": "text",
+      "content": "Scrum Master Scrum Masters are servant leaders who are focused on building high-performing Agile teams. They are advocates for and coach the team on Agile practice. Scrum Masters are cultural change agents that seek to continuously challenge and improve upon established process, identify and eliminate roadblocks, facilitate flow and consistent delivery, and help their team members communicate and coordinate. Essential Functions:",
+      "index": 5
+    },
+    {
+      "type": "list",
+      "list_type": "unordered",
+      "items": [
+        "Facilitates team events, including the daily stand-up, sprint planning, sprint retrospective, and sprint review",
+        "Guides the team toward predictable delivery of work product that meets the Definition of Done",
+        "Champions continuous improvement, seeking ways to help the team improve their efficiency",
+        "Works with the team to foster a culture of technical craftsmanship and high quality",
+        "Coaches the team in Scrum, XP, Kanban, and Scaled Agile concepts",
+        "Helps guide the team through the PI planning process, supporting them in creating a plan, identifying dependencies, and mitigating risk",
+        "Supports the Product Owner in their responsibility of managing the backlog",
+        "Builds partnerships with other Scrum Masters and Agile practitioners throughout the enterprise, advancing the state of practice",
+        "Assists the team in forming working agreements and adhering to them",
+        "Records meaningful metrics that the team finds useful and uses them to implement quantifiable improvement",
+        "Creates an encouraging and constructive team environment; builds trust and promotes team-building"
+      ],
+      "index": 6
+    },
+    {
+      "type": "text",
+      "content": "Key characteristics A good Scrum Master:",
+      "index": 7
+    },
+    {
+      "type": "list",
+      "list_type": "unordered",
+      "items": [
+        "Understands the importance of a &quot;listen-first&quot; mentality",
+        "Is an excellent verbal and written communicator",
+        "Chooses to influence and guide instead of direct and command",
+        "Can navigate interpersonal tension and conflict with diplomacy, compassion, and understanding",
+        "Is patient and enjoys the process of teaching; understands different learning styles",
+        "Emphasizes and builds a culture of &quot;systems thinking&quot; on the team",
+        "Frequently challenges the team to ask &quot;what if?&quot; and examine a better way",
+        "Loves to uncover the best in people",
+        "Enjoys measurement and working with data"
+      ],
+      "index": 8
+    },
+    {
+      "type": "text",
+      "content": "Product Owner Product Owners are responsible for maximizing the value that the team delivers. They own the team backlog, refining and prioritizing work. Product Owners act as a customer proxy for the team, working to understand the use-cases and pain points of users and bring that information back to the developers. Note: The is responsible for the Team Backlog and not product backlog, whereas the Product Manager is responsible for the Program Backlog . Product Owners are a member of the Agile Team, whereas Product Managers typically are not. Essential Functions",
+      "index": 9
+    },
+    {
+      "type": "list",
+      "list_type": "unordered",
+      "items": [
+        "Builds, edits, and maintains the Team Backlog",
+        "Prepares the backlog as necessary to support Sprint Planning",
+        "Validates work completed by the team, accepting Stories as done if they meet the and fulfill the specified acceptance criteria",
+        "Helps identify incoming and outgoing dependencies with other Product Owners",
+        "Works with the team to prepare for and participates in sprint",
+        "Leads the team through regular backlog refinement",
+        "Participates in the Continuous Exploration process with Product Management",
+        "Collaborates with Product Management, Business Owners, Customers, and other stakeholders as necessary",
+        "Work with team to create sprint goal?"
+      ],
+      "index": 10
+    },
+    {
+      "type": "text",
+      "content": "Key characteristics A good Product Owner:",
+      "index": 11
+    },
+    {
+      "type": "list",
+      "list_type": "unordered",
+      "items": [
+        "Excels in the organization and presentation of information to the scrum team",
+        "Can tailor their communication to effectively address various audiences - from engineers to executives as needed",
+        "Is passionate about the product development process",
+        "Knows how and when to say &quot;no&quot;",
+        "Is a gifted storyteller",
+        "Possesses a balance of technical acumen and leadership capability",
+        "Has the capability to process complex information in large amounts",
+        "Is a team player and natural collaborator"
+      ],
+      "index": 12
+    },
+    {
+      "type": "heading",
+      "level": 3,
+      "content": "Product Manager",
+      "index": 13
+    },
+    {
+      "type": "text",
+      "content": "An Agile Product Manager plays an active role in defining the product, creating epics, aligning with product owners and interacting with engineering teams at all moments during the product lifecycle. This helps to ensure the engineering team produces the correct features Essential Functions",
+      "index": 14
+    },
+    {
+      "type": "list",
+      "list_type": "unordered",
+      "items": [
+        "Defining a vision for the product",
+        "Creating roadmaps",
+        "Aligning stakeholders around the vision for the product",
+        "Prioritizing product features and capabilities",
+        "Understanding and representing end user needs",
+        "Monitoring the market and developing competitive analysis",
+        "Presenting epic overview to product owner and teams",
+        "0wns the product backlog"
+      ],
+      "index": 15
+    }
+  ],
+  "attachments": [],
+  "raw_html_length": 8337
+}

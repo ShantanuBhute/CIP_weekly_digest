@@ -1,0 +1,81 @@
+{
+  "status": "success",
+  "started_at": "2026-01-26T17:05:22.797728",
+  "pages_processed": [
+    {
+      "page_id": "164168599",
+      "page_title": "ProPM Roles & Responsibilities",
+      "space_key": "CIPPMOPF",
+      "status": "success",
+      "steps_completed": [
+        "detect_changes"
+      ],
+      "errors": [],
+      "has_changes": false,
+      "version": 1,
+      "change_summary": "No changes detected"
+    },
+    {
+      "page_id": "17386855",
+      "page_title": "RACI",
+      "space_key": "CIPPMOPF",
+      "status": "success",
+      "steps_completed": [
+        "detect_changes",
+        "extract_content",
+        "describe_images",
+        "upload_blob",
+        "index_search"
+      ],
+      "errors": [],
+      "has_changes": true,
+      "version": 2,
+      "change_summary": "NEW IMAGE ADDED: [HEADING Definition of RACI RACI is an acronym representing different roles in task completion. While there are various versions of this model, the key is to clearly define each role. Here\u2019s what each letter stands for: - R = Responsible : This is the task lead \u2013 the person ultimately responsible for completing the job. There should be only one Responsible person, though others can assist with the work. - A = Accountable : Also known as the approver or final approving authority, this person is answerable for the task\u2019s correct and thorough completion. They ensure prerequisites are met and delegate work to the Responsible person. The Accountable person must sign off on the work provided by the Responsible person. There should be only one Accountable person per task or deliverable. This role can be filled by the Responsible person, a technical expert, or a stakeholder. - C = Consulted : These individuals offer advice or guidance but do not actively work on the task. They are often subject matter experts who provide input or technical reviews. - I = Informed : These are the people kept up-to-date on progress, usually upon task or deliverable completion. Communication with them is one-way.  image-20260126-170300.png | IMAGE REMOVED: [HEADING] Definition of RACI RACI is an acronym representing different roles in task completion. While there are various versions of this model, the key is to clearly define each role. Here\u2019s what each letter stands for: - R = Responsible : This is the task lead \u2013 the person ultimately responsible for completing the job. There should be only one Responsible person, though others can assist with the work. - A = Accountable : Also known as the approver or final approving authority, this person is answerable for the task\u2019s correct and thorough completion. They ensure prerequisites are met and delegate work to the Responsible person. The Accountable person must sign off on the work provided by the Responsible person. There should be only one Accountable person per task or deliverable. This role can be filled by the Responsible person, a technical expert, or a stakeholder. - C = Consulted : These individuals offer advice or guidance but do not actively work on the task. They are often subject matter experts who provide input or technical reviews. - I = Informed : These are the people kept up-to-date on progress, usually upon task or deliverable completion. Communication with them is one-way. [IMAGE_EXTERNAL: Software Development Life Cycle (SDLC) - GeeksforGeeks | URL: https://media.geeksforgeeks.org/wp-content/uploads/20231220113035/SDLC.jpg]"
+    },
+    {
+      "page_id": "166041865",
+      "page_title": "Agile - Scrum Roles Responsibilities",
+      "space_key": "CIPPMOPF",
+      "status": "success",
+      "steps_completed": [
+        "detect_changes"
+      ],
+      "errors": [],
+      "has_changes": false,
+      "version": 1,
+      "change_summary": "No changes detected"
+    },
+    {
+      "page_id": "439124075",
+      "page_title": "EMPower AI Research",
+      "space_key": "CIPPMOPF",
+      "status": "success",
+      "steps_completed": [
+        "detect_changes",
+        "extract_content",
+        "describe_images",
+        "upload_blob",
+        "index_search"
+      ],
+      "errors": [],
+      "has_changes": true,
+      "version": 2,
+      "change_summary": "NEW IMAGE ADDED: image-20260126-150528.png Nothing is important other than this in the prcess we talked about earlier .  image-20260126-170118.png AGENTIC IS KIND OF NEW AS COMPARED THIS TRADITIONAL AND COMES UNDER DEEPLEARNNG PART OF THE DIAGRAM. | IMAGE REMOVED: [IMAGE_ATTACHMENT: image-20260126-150528.png] Nothing is important other than this in the prcess we talked about earlier . also Dog is considered man\u2019s Best friend"
+    }
+  ],
+  "pages_changed": [
+    "17386855",
+    "439124075"
+  ],
+  "steps_completed": [
+    "generate_email"
+  ],
+  "errors": [],
+  "email_files": [
+    "data/emails/digest_164168599_v1_20260126_170718.html",
+    "data/emails/digest_17386855_v2_20260126_170730.html",
+    "data/emails/digest_166041865_v1_20260126_170737.html",
+    "data/emails/digest_439124075_v2_20260126_170747.html"
+  ],
+  "completed_at": "2026-01-26T17:07:47.882773"
+}

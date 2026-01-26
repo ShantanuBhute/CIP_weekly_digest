@@ -1,0 +1,45 @@
+{
+  "_comment": "Pages configuration for CIP Weekly Digest",
+  "_note": "Add page IDs here to monitor multiple pages. Each page gets separate change tracking.",
+  
+  "pages": [
+    {
+      "page_id": "164168599",
+      "title": "ProPM Roles & Responsibilities",
+      "space_key": "CIPPMOPF"
+    },
+    {
+      "page_id": "17386855",
+      "title": "RACI",
+      "space_key": "CIPPMOPF"
+    },
+    {
+      "page_id": "166041865",
+      "title": "Agile - Scrum Roles Responsibilities",
+      "space_key": "CIPPMOPF"
+    },
+    {
+      "page_id": "439124075",
+      "title": "EMPower AI Research",
+      "space_key": "CIPPMOPF"
+    }
+  ],
+  
+  "_example_multiple_pages": [
+    {
+      "page_id": "164168599",
+      "title": "ProPM Roles & Responsibilities", 
+      "space_key": "CIPPMOPF"
+    },
+    {
+      "page_id": "XXXXXXXXX",
+      "title": "Subpage Title 1",
+      "space_key": "CIPPMOPF"
+    },
+    {
+      "page_id": "XXXXXXXXX", 
+      "title": "Subpage Title 2",
+      "space_key": "CIPPMOPF"
+    }
+  ]
+}

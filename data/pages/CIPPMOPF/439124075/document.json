@@ -1,0 +1,95 @@
+{
+  "metadata": {
+    "page_id": "439124075",
+    "title": "EMPower AI Research",
+    "space_key": "CIPPMOPF",
+    "version": 5,
+    "last_modified": "2026-01-26T17:24:46.167Z",
+    "url": "https://eaton-corp.atlassian.net/wiki/wiki/spaces/CIPPMOPF/pages/439124075",
+    "extracted_at": "2026-01-26T17:26:34.504096Z",
+    "total_blocks": 4,
+    "total_images": 2,
+    "attachment_images": 2,
+    "external_images": 0,
+    "attachments_count": 4,
+    "images_described": true,
+    "description_tokens_used": 2443,
+    "uploaded_to_blob": true,
+    "blob_container_media": "confluence-media",
+    "blob_container_rag": "confluence-rag",
+    "media_base_path": "CIPPMOPF/439124075/v5"
+  },
+  "content_blocks": [
+    {
+      "type": "text",
+      "content": "Nothing is important other than this in the prcess we talked about earlier .",
+      "index": 0
+    },
+    {
+      "type": "image",
+      "source": "attachment",
+      "filename": "image-20260126-150528.png",
+      "alt_text": "image-20260126-150528.png",
+      "width": 142,
+      "height": null,
+      "index": 1,
+      "local_path": "images\\001_image-20260126-150528.png",
+      "media_type": "image/png",
+      "file_size": 8421,
+      "description": "### Comprehensive Description of the Image:\n\n1. **Image Type**:\n   - This is a **diagram**. It visually represents a process or concept using shapes, arrows, and text.\n\n2. **Main Content**:\n   - The diagram illustrates a **cyclical process** involving two key components: \"Data Flywheel\" and \"Model Customization.\" It emphasizes a feedback loop where data and model customization interact.\n\n3. **Text Content**:\n   - The text in the image includes:\n     - \"Data Flywheel\" (centered at the top of the diagram).\n     - \"Model Customization\" (centered at the bottom of the diagram).\n\n4. **Visual Elements**:\n   - **Shapes**:\n     - At the top, there is a hexagonal icon with a green network-like pattern inside, representing the \"Data Flywheel.\"\n     - At the bottom, there is an icon resembling a hierarchical structure (a tree-like diagram) representing \"Model Customization.\"\n   - **Arrows**:\n     - Green curved arrows connect the two components in a circular motion, indicating a continuous loop.\n   - **Colors**:\n     - The primary color used is green, symbolizing growth, connection, or sustainability.\n     - The icons and arrows are green, while the background is white, creating a clean and minimalistic design.\n\n5. **Data/Information**:\n   - No specific numerical data or detailed information is presented. The focus is on the conceptual relationship between \"Data Flywheel\" and \"Model Customization.\"\n\n6. **Context**:\n   - The diagram likely serves to explain a process in a technical, scientific, or business context. It suggests a feedback loop where data is used to improve or customize a model, and the improved model generates more data, perpetuating the cycle.\n\n7. **Key Details**:\n   - The cyclical nature of the arrows emphasizes the iterative and continuous improvement process.\n   - The use of green and the specific icons suggest a focus on technology, machine learning, or data-driven processes.\n   - The simplicity of the design ensures clarity and focus on the relationship between the two components.\n\nThis diagram succinctly conveys the concept of a feedback loop between data and model customization, which is likely part of a larger system or methodology.",
+      "description_type": "general",
+      "blob_url": "https://cipdigest.blob.core.windows.net/confluence-media/CIPPMOPF/439124075/v5/001_image-20260126-150528.png"
+    },
+    {
+      "type": "image",
+      "source": "attachment",
+      "filename": "image-20260126-170118.png",
+      "alt_text": "image-20260126-170118.png",
+      "width": 334,
+      "height": null,
+      "index": 2,
+      "local_path": "images\\002_image-20260126-170118.png",
+      "media_type": "image/png",
+      "file_size": 394356,
+      "description": "### Comprehensive Image Analysis\n\n#### 1. **Image Type**:\n   - This is a **diagram** in the form of a **Venn diagram**.\n\n#### 2. **Main Content**:\n   - The image depicts the relationship between **Artificial Intelligence (AI)**, **Machine Learning (ML)**, **Deep Learning (DL)**, and **Data Science**, highlighting their overlapping areas and shared concepts.\n\n#### 3. **Text Content**:\n   - **Left Circle (Purple Shades)**:\n     - \"Artificial Intelligence (AI)\"\n     - \"Machine Learning (ML)\"\n     - \"Deep Learning (DL)\"\n   - **Right Circle (Yellow)**:\n     - \"Maths & Statistics\"\n     - \"Visualization\"\n     - \"EDA\" (Exploratory Data Analysis)\n   - **Intersection (Orange)**:\n     - \"DATA SCIENCE\"\n\n#### 4. **Visual Elements**:\n   - **Shapes**:\n     - Two overlapping circles:\n       - Left circle: Gradient shades of purple.\n       - Right circle: Yellow.\n       - The intersection is orange.\n   - **Colors**:\n     - Purple shades for AI, ML, and DL.\n     - Yellow for Maths, Statistics, Visualization, and EDA.\n     - Orange for the intersection labeled \"DATA SCIENCE.\"\n   - **Text**:\n     - White text is used for the labels in the purple and yellow circles.\n     - Black text is used for \"DATA SCIENCE\" in the orange intersection.\n   - **Arrangement**:\n     - The circles overlap in the center, emphasizing the shared area (Data Science) between the two domains.\n\n#### 5. **Data/Information**:\n   - The diagram visually explains that:\n     - **Artificial Intelligence (AI)** encompasses **Machine Learning (ML)** and **Deep Learning (DL)** as subsets.\n     - **Data Science** lies at the intersection of AI/ML/DL and mathematical/statistical techniques, visualization, and exploratory data analysis (EDA).\n\n#### 6. **Context**:\n   - The purpose of the image is to provide a conceptual overview of how Data Science integrates components of AI, ML, DL, and mathematical/statistical methods. It is likely used in educational or professional contexts to explain the relationships between these fields.\n\n#### 7. **Key Details**:\n   - The hierarchical relationship is implied:\n     - AI > ML > DL.\n   - Data Science is portrayed as a multidisciplinary field that combines computational techniques (AI/ML/DL) with mathematical/statistical methods and visualization tools.\n   - The use of distinct colors helps differentiate the domains while highlighting their overlap.\n\nThis diagram is a concise and visually appealing representation of the interconnectedness of these fields, making it useful for teaching or explaining the scope of Data Science.",
+      "description_type": "general",
+      "blob_url": "https://cipdigest.blob.core.windows.net/confluence-media/CIPPMOPF/439124075/v5/002_image-20260126-170118.png"
+    },
+    {
+      "type": "text",
+      "content": "AGENTIC IS KIND OF NEW AS COMPARED THIS TRADITIONAL AND COMES UNDER DEEPLEARNNG PART OF THE DIAGRAM.",
+      "index": 3
+    }
+  ],
+  "attachments": [
+    {
+      "id": "att1335754818",
+      "title": "image-20260126-170118.png",
+      "media_type": "image/png",
+      "file_size": 394356,
+      "download_link": "/download/attachments/439124075/image-20260126-170118.png?version=1&modificationDate=1769446881521&cacheVersion=1&api=v2"
+    },
+    {
+      "id": "att1334214657",
+      "title": "image-20260126-150528.png",
+      "media_type": "image/png",
+      "file_size": 8421,
+      "download_link": "/download/attachments/439124075/image-20260126-150528.png?version=1&modificationDate=1769439930961&cacheVersion=1&api=v2"
+    },
+    {
+      "id": "att1332150288",
+      "title": "image-20260126-141310.png",
+      "media_type": "image/png",
+      "file_size": 36706,
+      "download_link": "/download/attachments/439124075/image-20260126-141310.png?version=1&modificationDate=1769436791760&cacheVersion=1&api=v2"
+    },
+    {
+      "id": "att1329823813",
+      "title": "image-20260126-141254.png",
+      "media_type": "image/png",
+      "file_size": 11228,
+      "download_link": "/download/attachments/439124075/image-20260126-141254.png?version=1&modificationDate=1769436777296&cacheVersion=1&api=v2"
+    }
+  ],
+  "raw_html_length": 973
+}

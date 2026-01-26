@@ -1,0 +1,73 @@
+======================================================================
+TITLE: ProPM Roles & Responsibilities
+PAGE ID: 164168599
+SPACE: CIPPMOPF
+VERSION: 11
+LAST MODIFIED: 2024-10-14T09:07:27.074Z
+======================================================================
+
+
+[IMAGE 0]: image-20240607-074813.png
+  Alt: image-20240607-074813.png
+  File: images\000_image-20240607-074813.png
+
+
+[IMAGE 1]: image-20240605-155658.png
+  Alt: image-20240605-155658.png
+  File: images\001_image-20240605-155658.png
+
+
+## CIP Portfolio Manager:
+
+Creates and completes idea with required business case information and collaborating with the proposers as needed.
+
+  • Leads portfolio planning and waterlining process with the Portfolio team (Project Manager, Resource Managers and CIP Project Governance Committee).
+  • Work with Eaton Business stakeholders and end customers to understand their pain points and agree Business requirements for analytics solutions.
+  • Identify differentiating analytics features that meet the requirements cutting across Eaton Business segments
+  • Create a Vision, Strategy, solution specification, Roadmap, and solution backlog for the bespoke CIP Data solution.
+  • Estimate the Cost to serve and the ROI for the features of the solution and the solution itself
+  • Presents project to the CIP Governance Committee for review.
+  • Performs the conversion of ideas into projects once approved by the CIP Governance Committee.
+  • Track the performance of the solution through relevant metrics through the project lifecycle
+  • Assigns Project Managers to projects.
+
+
+## Resource Manager:
+
+The role of a Resource Manager in ProPM involves several key responsibilities, including assisting in estimating role requirements for ideas and projects, reviewing resource capacity versus demand, and making necessary resource allocation adjustments in collaboration with the Project Manager
+
+  • Resource Managers assists in estimating role requirements for ideas and projects. They will review resource capacity versus demand and will make allocation adjustments as needed and collaborate with the Project Manager.
+
+
+[TABLE]
+  | To improve transparency and communication between project stakeholders, a new email notification has been introduced for resource managers. The daily notification is sent to the resource's manager when another user (different from the direct manager) newly allocates one of their team members to a project or idea. The email is intended as information only and requires no action in ProPM. As such, the email is also sent to managers who don't have access to ProPM at this time . In case of any questions, concerns or necessary adjustments, reach out directly to the project manager and/or the author of the allocation (clicking on the email address opens a new Outlook email). Sample email: |
+  |  |
+
+
+[IMAGE 9]: image-20240605-155908.png
+  Alt: image-20240605-155908.png
+  File: images\009_image-20240605-155908.png
+
+
+## CIP Project Manager
+
+The Project Manager is responsible for the overall planning, execution, and delivery of a project (ProPM Project and Solution Epic Release). They work with a team of people to ensure that the project is completed on time, within budget, and to the required quality standards.
+
+  • Develop and manage project plan, budget, and schedule.
+
+
+[IMAGE 13]: image-20240607-105400.png
+  Alt: image-20240607-105400.png
+  File: images\013_image-20240607-105400.png
+
+  • Identify and manage risks and issues that could impact the project
+  • Coordinate the work of the project team and ensure that tasks are completed on time
+  • Communicate with stakeholders, including Portfolio Manager, Tech Leads, CIP Leadership, and team members, to keep them informed of the project&rsquo;s progress and address any issues or concerns
+  • Manage budgets and resources, including tracking expenses (via TIMS - actual hours) and ensuring that the project stays within budget
+  • Monitor and report on the project&rsquo;s progress to the senior management team and other stakeholders via by creating Monthly status report from ProPM for PUM meeting.
+  • Provide leadership and motivation to the project team to ensure that the project is completed successfully
+  • Coordinate planning and estimation sessions with the Project team to determine how the project will be delivered, Resources required and estimated timelines.
+  • Ensure ProPM project is kept up to date and current project progress including monthly cost actuals.
+  • Create relevant TIMS project codes for each region (US, Dublin, Pune).
+  • Validate TIMs hours for the project monthly with Project Leads.
+
