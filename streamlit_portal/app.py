@@ -166,6 +166,23 @@ def update_subscription(email: str, page_ids: list) -> bool:
         return False
 
 
+def unsubscribe_all(email: str) -> bool:
+    """Unsubscribe user from all pages"""
+    container = get_cosmos_client()
+    if not container:
+        return False
+    try:
+        existing = get_subscription(email)
+        if existing:
+            # Delete the subscription document
+            container.delete_item(item=existing["id"], partition_key="subscription")
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Error unsubscribing: {e}")
+        return False
+
+
 def main():
     # Header
     st.markdown('<p class="main-header">📧 CIP Digest Subscriptions</p>', unsafe_allow_html=True)
@@ -186,14 +203,26 @@ def main():
         """)
         st.info("Running in demo mode - subscriptions will not be saved.")
     
+    st.divider()
+    
     # User identification
-    st.subheader("📝 Your Information")
+    st.subheader("👤 Your Information")
     
     col1, col2 = st.columns(2)
     with col1:
-        email = st.text_input("Email Address", placeholder="your.email@eaton.com")
+        email = st.text_input(
+            "Email Address", 
+            placeholder="john.doe@eaton.com",
+            help="Enter your corporate email address"
+        )
     with col2:
-        name = st.text_input("Your Name", placeholder="John Doe")
+        name = st.text_input(
+            "Display Name", 
+            placeholder="John Doe",
+            help="Your name as it will appear in emails"
+        )
+    
+    st.divider()
     
     # Load existing subscription
     existing_sub = None
@@ -202,19 +231,19 @@ def main():
         existing_sub = get_subscription(email)
         if existing_sub:
             existing_pages = existing_sub.get("subscribed_pages", [])
-            st.success(f"✅ Found existing subscription for {email}")
+            name = existing_sub.get("name", name)  # Pre-fill name from existing subscription
     
     # Page selection
-    st.subheader("📄 Select Pages to Monitor")
-    st.markdown("Choose which Confluence pages you want to receive update notifications for:")
+    st.subheader("📄 Available Pages")
+    st.markdown("Select the pages you want to receive email updates for:")
     
     selected_pages = []
     for page_id, page_info in AVAILABLE_PAGES.items():
         is_checked = page_id in existing_pages
-        col1, col2 = st.columns([1, 10])
+        col1, col2 = st.columns([0.1, 0.9])
         with col1:
             checked = st.checkbox(
-                page_info["icon"],
+                "Select",
                 value=is_checked,
                 key=f"page_{page_id}",
                 label_visibility="collapsed"
@@ -223,45 +252,134 @@ def main():
             st.markdown(f"""
             <div class="page-card">
                 <strong>{page_info['icon']} {page_info['name']}</strong><br>
-                <small style="color: #666;">{page_info['description']}</small>
+                <small style="color: #666;">{page_info['description']}</small><br>
+                <small style="color: #999;">Page ID: {page_id} | Space: {page_info['space']}</small>
             </div>
             """, unsafe_allow_html=True)
         
         if checked:
             selected_pages.append(page_id)
     
-    # Subscribe button
-    st.markdown("---")
+    st.divider()
     
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # Summary
+    st.subheader("📋 Subscription Summary")
+    
+    if selected_pages:
+        st.success(f"✅ You have selected **{len(selected_pages)} page(s)** for email notifications:")
+        for page_id in selected_pages:
+            st.markdown(f"  - {AVAILABLE_PAGES[page_id]['icon']} {AVAILABLE_PAGES[page_id]['name']}")
+    else:
+        st.info("ℹ️ No pages selected. Select at least one page to receive email updates.")
+    
+    st.divider()
+    
+    # Action Buttons
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        save_btn = st.button("💾 Save Preferences", type="primary", use_container_width=True)
+    
     with col2:
-        if st.button("💾 Save Subscription", type="primary", use_container_width=True):
-            if not email:
-                st.error("Please enter your email address")
-            elif not name:
-                st.error("Please enter your name")
-            elif not selected_pages:
-                st.error("Please select at least one page to monitor")
-            elif not container:
-                st.warning("Demo mode: Subscription not saved (Cosmos DB not configured)")
-                st.info(f"Would subscribe {email} to {len(selected_pages)} page(s)")
+        if container:
+            load_btn = st.button("📥 Load My Settings", use_container_width=True)
+        else:
+            load_btn = False
+    
+    with col3:
+        if container:
+            unsub_btn = st.button("🚫 Unsubscribe All", use_container_width=True)
+        else:
+            unsub_btn = False
+    
+    # Handle Save
+    if save_btn:
+        if not email:
+            st.error("❌ Please enter your email address")
+        elif not name:
+            st.error("❌ Please enter your display name")
+        elif not selected_pages:
+            st.error("❌ Please select at least one page")
+        elif "@" not in email:
+            st.error("❌ Please enter a valid email address")
+        else:
+            if container:
+                try:
+                    if existing_sub:
+                        success = update_subscription(email, selected_pages)
+                        if success:
+                            st.success(f"""
+                            ✅ **Subscription updated successfully!**
+                            
+                            You will receive email updates when any of your {len(selected_pages)} subscribed pages are updated.
+                            """)
+                    else:
+                        success = create_subscription(email, name, selected_pages)
+                        if success:
+                            st.success(f"""
+                            ✅ **Subscription saved successfully!**
+                            
+                            You will receive email updates when any of your {len(selected_pages)} subscribed pages are updated.
+                            """)
+                            st.balloons()
+                except Exception as e:
+                    st.error(f"❌ Error saving subscription: {e}")
             else:
-                if existing_sub:
-                    success = update_subscription(email, selected_pages)
-                    if success:
-                        st.success(f"✅ Subscription updated! You're now monitoring {len(selected_pages)} page(s).")
+                # Demo mode
+                st.warning("Demo mode: Subscription not saved (Cosmos DB not configured)")
+                st.info(f"""
+                **Would save:**
+                - Email: {email}
+                - Name: {name}
+                - Pages: {', '.join([AVAILABLE_PAGES[p]['name'] for p in selected_pages])}
+                """)
+    
+    # Handle Load
+    if load_btn and email:
+        if existing_sub:
+            st.success(f"""
+            📥 **Found your subscription!**
+            
+            - **Name:** {existing_sub.get('name', 'N/A')}
+            - **Subscribed pages:** {len(existing_sub.get('subscribed_pages', []))}
+            - **Created:** {existing_sub.get('created_at', 'N/A')[:10]}
+            - **Last updated:** {existing_sub.get('updated_at', 'N/A')[:10]}
+            """)
+            for page_id in existing_sub.get('subscribed_pages', []):
+                page_name = AVAILABLE_PAGES.get(page_id, {}).get('name', page_id)
+                icon = AVAILABLE_PAGES.get(page_id, {}).get('icon', '📄')
+                st.markdown(f"  ✅ {icon} {page_name}")
+        else:
+            st.info("ℹ️ No subscription found for this email address")
+    
+    # Handle Unsubscribe
+    if unsub_btn and email:
+        if 'confirm_unsub' not in st.session_state:
+            st.session_state['confirm_unsub'] = False
+        
+        if st.session_state.get('confirm_unsub'):
+            try:
+                success = unsubscribe_all(email)
+                if success:
+                    st.success("✅ You have been unsubscribed from all pages")
+                    st.session_state['confirm_unsub'] = False
+                    # Clear the form
+                    st.rerun()
                 else:
-                    success = create_subscription(email, name, selected_pages)
-                    if success:
-                        st.success(f"✅ Subscribed! You'll receive emails when selected pages change.")
-                        st.balloons()
+                    st.info("ℹ️ No subscription found to remove")
+                    st.session_state['confirm_unsub'] = False
+            except Exception as e:
+                st.error(f"❌ Error unsubscribing: {e}")
+        else:
+            st.warning("⚠️ Click 'Unsubscribe All' again to confirm removal of all subscriptions")
+            st.session_state['confirm_unsub'] = True
     
     # Footer
-    st.markdown("---")
+    st.divider()
     st.markdown("""
     <div style="text-align: center; color: #999; font-size: 0.8rem;">
-        CIP Digest Subscription Portal | Powered by Azure Cosmos DB & Streamlit<br>
-        Questions? Contact the CIP team.
+        CIP Digest Subscription Portal | Powered by Azure Cosmos DB & Azure Functions<br>
+        Emails are generated automatically when Confluence pages are updated
     </div>
     """, unsafe_allow_html=True)
 
