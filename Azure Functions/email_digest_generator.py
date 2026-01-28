@@ -7,6 +7,7 @@ import os
 import sys
 import json
 import re
+import ssl
 import httpx
 from pathlib import Path
 from datetime import datetime
@@ -15,7 +16,7 @@ from openai import AzureOpenAI
 from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient, ContentSettings
 
 # Fix Windows console encoding for emojis
 if sys.platform == 'win32':
@@ -23,12 +24,21 @@ if sys.platform == 'win32':
 
 load_dotenv()
 
-# Azure OpenAI configuration
+# Disable SSL verification for corporate proxy
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Create SSL context that doesn't verify certificates (for corporate proxy)
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
+
+# Azure OpenAI configuration with timeout
 openai_client = AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-    http_client=httpx.Client(verify=False)
+    http_client=httpx.Client(verify=False, timeout=120.0)  # 2 minute timeout
 )
 
 # Azure AI Search configuration
@@ -40,12 +50,12 @@ SEARCH_INDEX_NAME = "confluence-rag-index"
 BLOB_ACCOUNT_NAME = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
 BLOB_ACCOUNT_KEY = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
 
-# Embedding configuration
+# Embedding configuration with timeout
 embedding_client = AzureOpenAI(
     azure_endpoint=os.getenv("FOUNDRY_EMBEDDING_ENDPOINT"),
     api_key=os.getenv("FOUNDRY_EMBEDDING_API_KEY"),
     api_version="2024-02-01",
-    http_client=httpx.Client(verify=False)
+    http_client=httpx.Client(verify=False, timeout=60.0)  # 1 minute timeout
 )
 
 MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
@@ -53,11 +63,101 @@ EMBEDDING_MODEL = os.getenv("FOUNDRY_EMBEDDING_DEPLOYMENT", "text-embedding-3-sm
 
 
 def get_blob_service_client():
-    """Get blob service client"""
+    """Get blob service client with SSL verification disabled for corporate proxy"""
+    from azure.core.pipeline.transport import RequestsTransport
+    import requests
+    
+    # Create a session that doesn't verify SSL
+    session = requests.Session()
+    session.verify = False
+    
     return BlobServiceClient(
         account_url=f"https://{BLOB_ACCOUNT_NAME}.blob.core.windows.net",
-        credential=BLOB_ACCOUNT_KEY
+        credential=BLOB_ACCOUNT_KEY,
+        transport=RequestsTransport(session=session),
+        max_single_put_size=4*1024*1024,  # 4MB
+        retry_total=1,  # Minimal retries
+        retry_connect=1,
+        retry_read=1
     )
+
+
+def upload_email_to_blob(page_id, version, html_content, metadata):
+    """
+    Upload email digest to Azure Blob Storage for email delivery system.
+    
+    Structure:
+    confluence-emails/
+    ├── {page_id}/
+    │   ├── latest/
+    │   │   ├── digest.html      (always current version)
+    │   │   └── metadata.json
+    │   └── archive/
+    │       └── digest_v{version}_{timestamp}.html
+    
+    Returns: URL to the latest email blob
+    """
+    EMAIL_CONTAINER = os.getenv("EMAIL_CONTAINER", "confluence-emails")
+    
+    try:
+        blob_service = get_blob_service_client()
+        container_client = blob_service.get_container_client(EMAIL_CONTAINER)
+        
+        # Create container if it doesn't exist
+        try:
+            container_client.create_container()
+            print(f"   📁 Created container: {EMAIL_CONTAINER}")
+        except Exception:
+            pass  # Container already exists
+        
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        
+        # 1. Upload to latest/ (overwrite) - with short timeout
+        latest_html_blob = f"{page_id}/latest/digest.html"
+        try:
+            container_client.upload_blob(
+                name=latest_html_blob,
+                data=html_content.encode('utf-8'),
+                content_settings=ContentSettings(content_type="text/html"),
+                overwrite=True,
+                timeout=10  # 10 second timeout
+            )
+        except Exception as e:
+            print(f"   ⚠️ Latest blob upload skipped: {str(e)[:50]}")
+        
+        # 2. Upload metadata to latest/
+        latest_meta_blob = f"{page_id}/latest/metadata.json"
+        try:
+            container_client.upload_blob(
+                name=latest_meta_blob,
+                data=json.dumps(metadata, indent=2).encode('utf-8'),
+                content_settings=ContentSettings(content_type="application/json"),
+                overwrite=True,
+                timeout=10
+            )
+        except Exception as e:
+            print(f"   ⚠️ Metadata blob upload skipped: {str(e)[:50]}")
+        
+        # 3. Archive this version (optional - skip on error)
+        archive_blob = f"{page_id}/archive/digest_v{version}_{timestamp}.html"
+        try:
+            container_client.upload_blob(
+                name=archive_blob,
+                data=html_content.encode('utf-8'),
+                content_settings=ContentSettings(content_type="text/html"),
+                overwrite=True,
+                timeout=10
+            )
+        except Exception as e:
+            print(f"   ⚠️ Archive blob upload skipped: {str(e)[:50]}")
+        
+        # Return URL to latest email
+        blob_url = f"https://{BLOB_ACCOUNT_NAME}.blob.core.windows.net/{EMAIL_CONTAINER}/{latest_html_blob}"
+        return blob_url
+        
+    except Exception as e:
+        print(f"   ⚠️ Email blob upload failed (non-blocking): {str(e)[:80]}")
+        return None  # Don't raise - continue with email sending
 
 
 def get_image_descriptions_from_document(page_id, space_key="CIPPMOPF"):
@@ -457,6 +557,7 @@ def agent_html_formatter(summary):
     AGENT 2: HTML Formatter
     Takes plain text summary from Agent 1 and converts to polished HTML.
     Handles line breaks, paragraph structure, and styling.
+    Uses teal/green color scheme matching the email template.
     FLAT bullets only - no nesting.
     """
     print(f"🎨 Agent 2 (HTML Formatter): Styling content...")
@@ -492,10 +593,10 @@ def agent_html_formatter(summary):
                 in_bullet_list = False
             
             if is_key_header:
-                # Prominent styling for key headers
-                formatted_parts.append(f'<p style="margin: 18px 0 8px 0; padding: 8px 12px; background: linear-gradient(90deg, #e8f0fe 0%, #f8f9fa 100%); border-left: 4px solid #1a73e8; border-radius: 0 4px 4px 0;"><strong style="color: #1a73e8; font-size: 15px;">{line}</strong></p>')
+                # Prominent styling for key headers - teal theme
+                formatted_parts.append(f'<p style="margin: 18px 0 8px 0; padding: 8px 12px; background-color: #e0f2f1; border-left: 4px solid #00796b; border-radius: 0 4px 4px 0;"><strong style="color: #00796b; font-size: 15px;">{line}</strong></p>')
             else:
-                formatted_parts.append(f'<p style="margin: 15px 0 5px 0;"><strong style="color: #1a73e8;">{line}</strong></p>')
+                formatted_parts.append(f'<p style="margin: 15px 0 5px 0;"><strong style="color: #00796b;">{line}</strong></p>')
         
         # Check if it's a bullet point
         elif line.startswith('•') or line.startswith('-') or line.startswith('*'):
@@ -524,181 +625,214 @@ def agent_html_formatter(summary):
 
 def format_email_html(page_title, page_url, version, summary, chunks, has_changes, change_summary):
     """
-    Format beautiful HTML email
+    Format beautiful HTML email using professional teal/green template
     """
-    # Build change summary banner
-    # If NO changes → show brief status at top
-    # If HAS changes → move detailed updates to bottom
-    
-    if has_changes and change_summary and change_summary != "No changes":
-        # Changes detected - put banner at BOTTOM
-        top_status_banner = ""
-        bottom_updates_section = f"""
-        <h2 style="margin-top: 30px;">📝 Recent Updates</h2>
-        <div style="background: #e6f4ea; border-left: 4px solid #34a853; padding: 12px 15px; margin: 15px 0; border-radius: 0 5px 5px 0;">
-            <p style="margin: 0; font-size: 14px; color: #333;">{change_summary}</p>
-        </div>
-        """
-    else:
-        # No changes - show brief status at top
-        top_status_banner = f"""
-        <div style="background: #f8f9fa; border-left: 4px solid #9aa0a6; padding: 10px 15px; margin: 15px 0; border-radius: 0 5px 5px 0;">
-            <span style="color: #5f6368; font-size: 13px;">ℹ️ No changes since last version</span>
-        </div>
-        """
-        bottom_updates_section = ""
-    
-    # Build content preview - show sections now instead of chunks
-    content_preview = "<h3 style='margin-bottom: 10px;'>📄 Page Sections</h3><ul style='margin: 0; padding-left: 20px;'>"
-    for chunk in chunks[:8]:  # Show first 8 sections
-        content_text = chunk.get('content_text', '')
-        # Get first line as section title
-        first_line = content_text.split('\n')[0].strip('#').strip()[:60]
-        if first_line:
-            content_preview += f"<li style='margin: 4px 0;'>{first_line}</li>"
-    content_preview += "</ul>"
-    
-    if len(chunks) > 8:
-        content_preview += f"<p style='margin: 5px 0; font-style: italic;'>...and {len(chunks) - 8} more sections</p>"
-    
     # Format summary using Agent 2 (HTML Formatter)
     formatted_summary = agent_html_formatter(summary)
     
-    html = f"""<!DOCTYPE html>
-<html>
+    # Build change notice section
+    if has_changes and change_summary and change_summary != "No changes":
+        change_notice = f"""
+                    <!-- Change Notice -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-radius: 8px; overflow: hidden; background-color: #fff8e1; border: 2px solid #ffd54f;">
+                                <tr>
+                                    <td style="padding: 15px; font-size: 14px; color: #f57f17; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                        <strong style="display: block; margin-bottom: 4px;">⚡ Recent Changes</strong>
+                                        {change_summary}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+        """
+    else:
+        change_notice = """
+                    <!-- No Changes Notice -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-radius: 8px; overflow: hidden; background-color: #f1f8f6; border: 1px solid #b2dfdb;">
+                                <tr>
+                                    <td style="padding: 12px 15px; font-size: 13px; color: #00796b; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                        ℹ️ No changes since last version
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+        """
+    
+    # Build content preview - show sections
+    content_items = ""
+    for chunk in chunks[:6]:  # Show first 6 sections
+        content_text = chunk.get('content_text', '')
+        first_line = content_text.split('\n')[0].strip('#').strip()[:60]
+        if first_line:
+            content_items += f"<li style='margin: 4px 0;'>{first_line}</li>"
+    
+    if len(chunks) > 6:
+        content_items += f"<li style='margin: 4px 0; font-style: italic;'>...and {len(chunks) - 6} more sections</li>"
+    
+    # Extract space key from URL
+    space_key = "CIPPMOPF"
+    if "/spaces/" in page_url:
+        try:
+            space_key = page_url.split("/spaces/")[1].split("/")[0]
+        except:
+            pass
+    
+    html = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <meta charset="UTF-8">
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            line-height: 1.5;
-            color: #333;
-            max-width: 700px;
-            margin: 0 auto;
-            padding: 15px;
-            background: #f5f5f5;
-        }}
-        .email-container {{
-            background: white;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }}
-        h1 {{
-            color: #1a73e8;
-            margin: 0 0 15px 0;
-            border-bottom: 3px solid #1a73e8;
-            padding-bottom: 12px;
-            font-size: 22px;
-        }}
-        h2 {{
-            color: #5f6368;
-            margin: 20px 0 10px 0;
-            font-size: 18px;
-        }}
-        h3 {{
-            color: #5f6368;
-            margin: 15px 0 8px 0;
-            font-size: 16px;
-        }}
-        h4 {{
-            color: #1a73e8;
-            margin: 12px 0 6px 0;
-            font-size: 14px;
-        }}
-        .meta {{
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 5px;
-            margin: 15px 0;
-            font-size: 13px;
-            line-height: 1.6;
-        }}
-        .meta strong {{
-            color: #1a73e8;
-        }}
-        .summary {{
-            background: #e8f0fe;
-            border-left: 4px solid #1a73e8;
-            padding: 15px;
-            margin: 15px 0;
-            font-size: 14px;
-            line-height: 1.5;
-        }}
-        .summary p {{
-            margin: 6px 0;
-        }}
-        .summary ul {{
-            margin: 5px 0;
-            padding-left: 20px;
-        }}
-        .summary li {{
-            margin: 3px 0;
-        }}
-        .btn {{
-            display: inline-block;
-            background: #1a73e8;
-            color: white !important;
-            padding: 10px 25px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: 500;
-            margin: 15px 0;
-            font-size: 14px;
-        }}
-        .btn:hover {{
-            background: #1557b0;
-        }}
-        .content-preview {{
-            background: #fafafa;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-            font-size: 13px;
-        }}
-        .content-preview ul {{
-            margin: 5px 0;
-            padding-left: 20px;
-        }}
-        .content-preview li {{
-            margin: 4px 0;
-        }}
-        .footer {{
-            margin-top: 25px;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
-            font-size: 12px;
-            color: #666;
-            text-align: center;
-        }}
-    </style>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>{page_title}</title>
 </head>
-<body>
-    <div class="email-container">
-        <h1>📋 {page_title}</h1>
-        
-        <div class="meta">
-            <strong>📅 Generated:</strong> {datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}<br>
-            <strong>📝 Version:</strong> v{version}<br>
-            <strong>🔗 Link:</strong> <a href="{page_url}">{page_url}</a>
-        </div>
-        
-        {top_status_banner}
-        
-        <h2>📝 Executive Summary</h2>
-        <div class="summary">
-            {formatted_summary}
-        </div>
-        
-        <a href="{page_url}" class="btn">📖 View Full Page in Confluence</a>
-        
-        <div class="content-preview">
-            {content_preview}
-        </div>
-        
-        {bottom_updates_section}
-        
-    </div>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+    <!-- Main Container -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f5f5f5; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <!-- Email Content -->
+                <table border="0" cellpadding="0" cellspacing="0" width="750" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                    
+                    <!-- Accent Bar -->
+                    <tr>
+                        <td bgcolor="#00796b" style="background-color: #00796b; padding: 4px 0;"></td>
+                    </tr>
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 30px 30px 10px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td>
+                                        <div style="display: inline-block; background-color: #00796b; color: #ffffff; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                            Weekly Update
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <h1 style="margin: 0; color: #004d40; font-size: 26px; font-weight: 600; line-height: 1.3; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                {page_title}
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Meta Information Cards -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td width="48%" style="vertical-align: top;">
+                                        <table border="0" cellpadding="12" cellspacing="0" width="100%" style="background-color: #f1f8f6; border-radius: 8px;">
+                                            <tr>
+                                                <td>
+                                                    <div style="font-size: 11px; color: #00796b; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">Generated</div>
+                                                    <div style="font-size: 13px; color: #004d40; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">{datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}</div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td width="4%"></td>
+                                    <td width="48%" style="vertical-align: top;">
+                                        <table border="0" cellpadding="12" cellspacing="0" width="100%" style="background-color: #f1f8f6; border-radius: 8px;">
+                                            <tr>
+                                                <td>
+                                                    <div style="font-size: 11px; color: #00796b; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">Version</div>
+                                                    <div style="font-size: 13px; color: #004d40; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">v{version}</div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {change_notice}
+
+                    <!-- Executive Summary -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="padding: 0 0 12px 0;">
+                                        <h2 style="margin: 0; color: #00796b; font-size: 18px; font-weight: 600; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                            📝 Executive Summary
+                                        </h2>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 18px; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; color: #004d40; line-height: 1.7; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                        {formatted_summary}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- CTA Button - Email Safe (no gradients) -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td align="center" bgcolor="#00796b" style="border-radius: 8px; background-color: #00796b;">
+                                        <a href="{page_url}" target="_blank" style="font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; display: inline-block; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #00796b;">
+                                            Open in Confluence →
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Content Preview -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <table border="0" cellpadding="18" cellspacing="0" width="100%" style="background-color: #ffffff; border-radius: 8px; border: 1px solid #e0e0e0;">
+                                <tr>
+                                    <td style="font-size: 14px; color: #333333; line-height: 1.7; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                        <h3 style="margin: 0 0 10px 0; color: #00796b; font-size: 15px; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">📄 Page Sections</h3>
+                                        <ul style="margin: 0; padding-left: 20px;">
+                                            {content_items}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px 30px 30px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="border-top: 1px solid #e0e0e0; padding-top: 20px; text-align: center;">
+                                        <div style="font-size: 12px; color: #757575; line-height: 1.6; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                            This is an automated digest from Confluence
+                                        </div>
+                                        <div style="font-size: 12px; margin-top: 8px; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                                            <a href="{page_url}" style="color: #00796b; text-decoration: none; font-weight: 500;">View {page_title} Online</a>
+                                            <span style="color: #bdbdbd; margin: 0 8px;">|</span>
+                                            <a href="#" style="color: #00796b; text-decoration: none; font-weight: 500;">Preferences</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>"""
     
@@ -749,7 +883,7 @@ def generate_page_summary_email(page_id, page_title, version, has_changes, chang
         change_summary=friendly_change_summary  # Use the simplified version
     )
     
-    # Step 4: Save outputs
+    # Step 4: Save outputs locally
     os.makedirs("data/emails", exist_ok=True)
     timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     
@@ -758,23 +892,34 @@ def generate_page_summary_email(page_id, page_title, version, has_changes, chang
         f.write(html)
     
     json_file = f"data/emails/digest_{page_id}_v{version}_{timestamp}.json"
+    metadata = {
+        'page_id': page_id,
+        'page_title': page_title,
+        'version': version,
+        'has_changes': has_changes,
+        'change_summary': change_summary,
+        'summary': summary,
+        'generated_at': datetime.utcnow().isoformat(),
+        'chunks_count': len(chunks)
+    }
     with open(json_file, 'w') as f:
-        json.dump({
-            'page_id': page_id,
-            'page_title': page_title,
-            'version': version,
-            'has_changes': has_changes,
-            'change_summary': change_summary,
-            'summary': summary,
-            'generated_at': datetime.utcnow().isoformat(),
-            'chunks_count': len(chunks)
-        }, f, indent=2)
+        json.dump(metadata, f, indent=2)
+    
+    # Step 5: Upload to Azure Blob Storage for email delivery
+    blob_url = None
+    try:
+        blob_url = upload_email_to_blob(page_id, version, html, metadata)
+        print(f"☁️  Uploaded to Blob: {blob_url}")
+    except Exception as e:
+        print(f"⚠️  Blob upload failed (continuing): {e}")
     
     print("="*70)
     print("EMAIL DIGEST COMPLETE")
     print("="*70)
     print(f"📧 HTML: {html_file}")
     print(f"📄 JSON: {json_file}")
+    if blob_url:
+        print(f"☁️  Blob: {blob_url}")
     print(f"📊 Content: {len(chunks)} chunks indexed")
     print("="*70 + "\n")
     
@@ -782,7 +927,10 @@ def generate_page_summary_email(page_id, page_title, version, has_changes, chang
         'status': 'success',
         'html_file': html_file,
         'json_file': json_file,
-        'chunks_count': len(chunks)
+        'blob_url': blob_url,
+        'chunks_count': len(chunks),
+        'html_content': html,
+        'metadata': metadata
     }
 
 

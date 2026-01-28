@@ -1,0 +1,34 @@
+# Ignore local virtual environment
+.venv/
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore local data
+data/
+
+# Ignore test files
+test_*.py
+tests/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore local settings (use Application Settings in Azure)
+local.settings.json
+
+# Ignore Streamlit (deploy separately)
+streamlit_app.py
+
+# Ignore documentation
+*.md
+docs/

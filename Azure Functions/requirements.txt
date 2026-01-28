@@ -1,0 +1,25 @@
+# Azure Functions runtime
+azure-functions
+
+# Azure SDK libraries
+azure-core
+azure-cosmos
+azure-search-documents
+azure-storage-blob
+
+# OpenAI
+openai
+
+# HTTP clients
+httpx
+requests
+urllib3
+
+# Environment & config
+python-dotenv
+
+# HTML parsing
+beautifulsoup4
+
+# Image processing
+Pillow

@@ -1,2 +1,33 @@
+# Environment and secrets - NEVER COMMIT THESE
 .env
-.venv
+.env.*
+*.env
+local.settings.json
+**/local.settings.json
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Local data
+data/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Azure Functions local files
+bin/
+obj/
