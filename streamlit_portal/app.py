@@ -131,15 +131,27 @@ def create_subscription(email: str, name: str, page_ids: list) -> bool:
     if not container:
         return False
     try:
+        now = datetime.utcnow().isoformat()
         subscription = {
             "id": email.lower().replace("@", "_at_").replace(".", "_"),
-            "partitionKey": "subscription",
+            "partitionKey": "subscriptions",
             "email": email.lower(),
-            "name": name,
-            "subscribed_pages": page_ids,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "is_active": True
+            "displayName": name,
+            "isVerified": False,
+            "subscriptions": [
+                {
+                    "pageId": page_id,
+                    "pageName": AVAILABLE_PAGES[page_id]["name"],
+                    "subscribedAt": now
+                }
+                for page_id in page_ids if page_id in AVAILABLE_PAGES
+            ],
+            "preferences": {
+                "frequency": "immediate",
+                "digestFormat": "html"
+            },
+            "createdAt": now,
+            "updatedAt": now
         }
         container.upsert_item(subscription)
         return True
@@ -156,8 +168,27 @@ def update_subscription(email: str, page_ids: list) -> bool:
     try:
         existing = get_subscription(email)
         if existing:
-            existing["subscribed_pages"] = page_ids
-            existing["updated_at"] = datetime.utcnow().isoformat()
+            now = datetime.utcnow().isoformat()
+            
+            # Build subscriptions list preserving existing timestamps
+            current_subs = {s['pageId']: s for s in existing.get('subscriptions', [])}
+            
+            new_subscriptions = []
+            for page_id in page_ids:
+                if page_id in AVAILABLE_PAGES:
+                    if page_id in current_subs:
+                        # Keep existing subscription with original timestamp
+                        new_subscriptions.append(current_subs[page_id])
+                    else:
+                        # New subscription
+                        new_subscriptions.append({
+                            "pageId": page_id,
+                            "pageName": AVAILABLE_PAGES[page_id]["name"],
+                            "subscribedAt": now
+                        })
+            
+            existing['subscriptions'] = new_subscriptions
+            existing['updatedAt'] = now
             container.upsert_item(existing)
             return True
         return False
@@ -175,7 +206,7 @@ def unsubscribe_all(email: str) -> bool:
         existing = get_subscription(email)
         if existing:
             # Delete the subscription document
-            container.delete_item(item=existing["id"], partition_key="subscription")
+            container.delete_item(item=existing["id"], partition_key="subscriptions")
             return True
         return False
     except Exception as e:
@@ -230,8 +261,9 @@ def main():
     if email and container:
         existing_sub = get_subscription(email)
         if existing_sub:
-            existing_pages = existing_sub.get("subscribed_pages", [])
-            name = existing_sub.get("name", name)  # Pre-fill name from existing subscription
+            # Extract page IDs from the subscriptions array
+            existing_pages = [s['pageId'] for s in existing_sub.get('subscriptions', [])]
+            name = existing_sub.get('displayName', name)  # Pre-fill name from existing subscription
     
     # Page selection
     st.subheader("📄 Available Pages")
@@ -337,18 +369,21 @@ def main():
     # Handle Load
     if load_btn and email:
         if existing_sub:
+            subscriptions = existing_sub.get('subscriptions', [])
             st.success(f"""
             📥 **Found your subscription!**
             
-            - **Name:** {existing_sub.get('name', 'N/A')}
-            - **Subscribed pages:** {len(existing_sub.get('subscribed_pages', []))}
-            - **Created:** {existing_sub.get('created_at', 'N/A')[:10]}
-            - **Last updated:** {existing_sub.get('updated_at', 'N/A')[:10]}
+            - **Name:** {existing_sub.get('displayName', 'N/A')}
+            - **Subscribed pages:** {len(subscriptions)}
+            - **Created:** {existing_sub.get('createdAt', 'N/A')[:10]}
+            - **Last updated:** {existing_sub.get('updatedAt', 'N/A')[:10]}
             """)
-            for page_id in existing_sub.get('subscribed_pages', []):
-                page_name = AVAILABLE_PAGES.get(page_id, {}).get('name', page_id)
+            for sub in subscriptions:
+                page_id = sub.get('pageId')
+                page_name = sub.get('pageName', page_id)
+                subscribed_at = sub.get('subscribedAt', 'N/A')[:10]
                 icon = AVAILABLE_PAGES.get(page_id, {}).get('icon', '📄')
-                st.markdown(f"  ✅ {icon} {page_name}")
+                st.markdown(f"  ✅ {icon} **{page_name}** (subscribed: {subscribed_at})")
         else:
             st.info("ℹ️ No subscription found for this email address")
     
