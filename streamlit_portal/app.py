@@ -5,6 +5,7 @@ A simple UI for managing email subscriptions to Confluence page updates
 
 import streamlit as st
 import os
+import requests
 from datetime import datetime
 from azure.cosmos import CosmosClient, PartitionKey
 
@@ -94,6 +95,53 @@ st.sidebar.write(f"Key starts with: `{COSMOS_KEY[:10]}...`" if COSMOS_KEY else "
 st.sidebar.write(f"Key length: `{len(COSMOS_KEY)}`" if COSMOS_KEY else "")
 st.sidebar.write(f"Database: `{COSMOS_DATABASE}`")
 st.sidebar.write(f"Container: `{COSMOS_CONTAINER}`")
+
+# Azure Functions URL for manual trigger
+FUNCTION_APP_URL = "https://cip-digest-functions.azurewebsites.net/api/run_pipeline"
+
+# Manual Trigger Section in Sidebar
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ⚡ Manual Actions")
+st.sidebar.markdown("*Run digest check immediately instead of waiting for scheduled run*")
+
+# Page selector for manual trigger
+trigger_page = st.sidebar.selectbox(
+    "Select page to check:",
+    options=["All Pages"] + list(AVAILABLE_PAGES.keys()),
+    format_func=lambda x: "All Pages" if x == "All Pages" else f"{AVAILABLE_PAGES[x]['icon']} {AVAILABLE_PAGES[x]['name']}"
+)
+
+# Force email checkbox
+force_email = st.sidebar.checkbox("📧 Force send email (even if no changes)", value=False)
+
+if st.sidebar.button("🚀 Run Digest Now", type="primary", use_container_width=True):
+    with st.sidebar:
+        with st.spinner("Running digest pipeline..."):
+            try:
+                # Build URL with parameters
+                params = {}
+                if trigger_page != "All Pages":
+                    params['page_id'] = trigger_page
+                if force_email:
+                    params['force_email'] = 'true'
+                
+                response = requests.get(FUNCTION_APP_URL, params=params, timeout=120)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    st.success(f"✅ Pipeline completed!")
+                    st.write(f"**Pages processed:** {result.get('pages_processed', 0)}")
+                    st.write(f"**Changes found:** {result.get('pages_changed', 0)}")
+                    st.write(f"**Emails sent:** {result.get('emails_sent', 0)}")
+                else:
+                    st.error(f"❌ Error: {response.status_code}")
+                    st.write(response.text[:200])
+            except requests.exceptions.Timeout:
+                st.warning("⏳ Request timed out - pipeline may still be running")
+            except Exception as e:
+                st.error(f"❌ Failed to trigger: {str(e)}")
+
+st.sidebar.markdown("---")
 
 
 @st.cache_resource

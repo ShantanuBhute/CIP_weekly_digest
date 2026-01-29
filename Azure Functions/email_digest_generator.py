@@ -223,7 +223,8 @@ def get_previous_image_descriptions(page_id, previous_version, space_key="CIPPMO
 
 def retrieve_page_content(page_id):
     """
-    Retrieve all indexed chunks for a page from Azure AI Search
+    Retrieve all indexed chunks for a page from Azure AI Search.
+    Returns tuple: (chunks, metadata) where metadata contains page_title and version
     """
     print(f"🔍 Retrieving indexed content for page {page_id}...")
     
@@ -234,18 +235,30 @@ def retrieve_page_content(page_id):
         connection_verify=False
     )
     
-    # Get all chunks for this page
+    # Get all chunks for this page - include page_title and version
     results = search_client.search(
         search_text="*",
         filter=f"page_id eq '{page_id}'",
-        select=["chunk_id", "chunk_index", "content_type", "content_text", "has_image", "image_description", "image_url"]
+        select=["chunk_id", "chunk_index", "content_type", "content_text", "has_image", "image_description", "image_url", "page_title", "version"]
     )
     
     # Sort by chunk_index after retrieval
     chunks = sorted(list(results), key=lambda x: x.get('chunk_index', 0))
-    print(f"✅ Retrieved {len(chunks)} chunks\n")
+    print(f"✅ Retrieved {len(chunks)} chunks")
     
-    return chunks
+    # Extract metadata from first chunk (all chunks have same page_title/version)
+    metadata = {
+        'page_title': None,
+        'version': None
+    }
+    if chunks:
+        first_chunk = chunks[0]
+        metadata['page_title'] = first_chunk.get('page_title')
+        metadata['version'] = first_chunk.get('version')
+        print(f"   📄 Page title: {metadata['page_title']}")
+        print(f"   📋 Version: {metadata['version']}\n")
+    
+    return chunks, metadata
 
 
 def agent_content_writer(page_title, chunks, has_changes, change_summary):
@@ -839,33 +852,56 @@ def format_email_html(page_title, page_url, version, summary, chunks, has_change
     return html
 
 
-def generate_page_summary_email(page_id, page_title, version, has_changes, change_summary, previous_version=None):
+def generate_page_summary_email(page_id, page_title=None, version=None, has_changes=False, change_summary=None, previous_version=None):
     """
     Main function to generate complete email digest using 2-agent architecture.
     
     Agent 1 (Content Writer): Generates structured text summary from RAG context
     Agent 1.5 (Change Summarizer): Simplifies raw change data to human-friendly summary
     Agent 2 (HTML Formatter): Converts text to polished HTML email
+    
+    Note: page_title and version can be overridden from Azure Search index data
     """
     print("\n" + "="*70)
     print("EMAIL DIGEST GENERATION (2-Agent Architecture)")
     print("="*70 + "\n")
     
-    # Step 1: Retrieve indexed content
-    chunks = retrieve_page_content(page_id)
+    # Step 1: Retrieve indexed content (includes page_title and version from index)
+    chunks, index_metadata = retrieve_page_content(page_id)
     
     if not chunks:
         print("❌ No indexed content found. Run indexer first.\n")
         return {'status': 'error', 'message': 'No content indexed'}
     
+    # Use index metadata for title/version if not provided or if they're defaults
+    # This ensures we always show the correct page name and version from the indexed data
+    if index_metadata.get('page_title'):
+        actual_page_title = index_metadata['page_title']
+        if page_title and page_title != actual_page_title:
+            print(f"   ℹ️ Using indexed title '{actual_page_title}' instead of '{page_title}'")
+        page_title = actual_page_title
+    elif not page_title or page_title.startswith('Page '):
+        page_title = f"Page {page_id}"  # Fallback
+    
+    if index_metadata.get('version'):
+        actual_version = index_metadata['version']
+        if version != actual_version:
+            print(f"   ℹ️ Using indexed version {actual_version} instead of {version}")
+        version = actual_version
+    
+    print(f"   📄 Final page title: {page_title}")
+    print(f"   📋 Final version: v{version}")
+    
     # Step 2: Agent 1.5 - Simplify change summary (if there are changes)
     friendly_change_summary = None
-    if has_changes and change_summary and change_summary != "No changes":
+    if has_changes and change_summary and change_summary != "No changes" and change_summary != "No changes detected":
         friendly_change_summary = agent_change_summarizer(
             change_summary, 
             page_id=page_id, 
             previous_version=previous_version
         )
+    elif not has_changes:
+        friendly_change_summary = "No specific changes or updates were described. No images or text details provided for summarization."
     
     # Step 3: Agent 1 - Generate content summary
     summary = agent_content_writer(page_title, chunks, has_changes, change_summary)
@@ -883,15 +919,27 @@ def generate_page_summary_email(page_id, page_title, version, has_changes, chang
         change_summary=friendly_change_summary  # Use the simplified version
     )
     
-    # Step 4: Save outputs locally
-    os.makedirs("data/emails", exist_ok=True)
+    # Step 4: Save outputs locally (use /tmp in Azure Functions)
+    # Detect Azure via multiple env vars since different versions set different vars
+    is_azure = any([
+        os.getenv("AZURE_FUNCTIONS_ENVIRONMENT"),
+        os.getenv("WEBSITE_INSTANCE_ID"),
+        os.getenv("WEBSITE_SITE_NAME"),
+        os.getenv("FUNCTIONS_WORKER_RUNTIME")
+    ])
+    
+    if is_azure:
+        emails_folder = "/tmp/data/emails"
+    else:
+        emails_folder = "data/emails"
+    os.makedirs(emails_folder, exist_ok=True)
     timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     
-    html_file = f"data/emails/digest_{page_id}_v{version}_{timestamp}.html"
+    html_file = f"{emails_folder}/digest_{page_id}_v{version}_{timestamp}.html"
     with open(html_file, 'w', encoding='utf-8') as f:
         f.write(html)
     
-    json_file = f"data/emails/digest_{page_id}_v{version}_{timestamp}.json"
+    json_file = f"{emails_folder}/digest_{page_id}_v{version}_{timestamp}.json"
     metadata = {
         'page_id': page_id,
         'page_title': page_title,

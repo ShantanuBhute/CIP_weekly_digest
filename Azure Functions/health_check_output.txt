@@ -1,0 +1,1 @@
+{"status": "healthy", "timestamp": "2026-01-29T13:55:52.002943", "message": "Function app is running!", "debug": {"AZURE_FUNCTIONS_ENVIRONMENT": "not_set", "WEBSITE_INSTANCE_ID": "not_set", "is_azure_detected": false, "data_folder_would_be": "data"}}

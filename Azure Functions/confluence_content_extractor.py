@@ -29,8 +29,41 @@ email = os.getenv("CONFLUENCE_EMAIL")
 headers = {"Accept": "application/json"}
 auth = HTTPBasicAuth(email, api_token) if email else HTTPBasicAuth("", api_token)
 
-# Data folder setup
-DATA_FOLDER = Path("data")
+# Data folder setup - use /tmp for Azure Functions, local data/ for development
+def get_data_folder():
+    """Get the appropriate data folder based on environment
+    
+    Note: This function is called at runtime (not module load time) to ensure
+    environment variables are properly available in Azure Functions.
+    
+    Detects Azure Functions via multiple environment variables since different
+    versions may set different variables.
+    """
+    is_azure = any([
+        os.getenv("AZURE_FUNCTIONS_ENVIRONMENT"),
+        os.getenv("WEBSITE_INSTANCE_ID"),
+        os.getenv("WEBSITE_SITE_NAME"),
+        os.getenv("FUNCTIONS_WORKER_RUNTIME")
+    ])
+    
+    if is_azure:
+        # Running in Azure Functions - use /tmp
+        return Path("/tmp/data")
+    else:
+        # Local development
+        return Path("data")
+
+def get_pages_folder():
+    """Get the pages folder path - computed at runtime"""
+    return get_data_folder() / "pages"
+
+def get_images_folder():
+    """Get the images folder path - computed at runtime"""
+    return get_data_folder() / "images"
+
+# Keep these for backwards compatibility but they will be computed at import time
+# For reliable Azure Functions operation, use the get_*_folder() functions instead
+DATA_FOLDER = get_data_folder()
 PAGES_FOLDER = DATA_FOLDER / "pages"
 IMAGES_FOLDER = DATA_FOLDER / "images"
 
@@ -353,9 +386,10 @@ def extract_and_save_page(page_id, output_folder=None):
     print(f"📁 Space: {space_key}")
     print(f"📋 Version: {version}")
     
-    # Setup folders
+    # Setup folders - use runtime function to ensure Azure env vars are available
     if output_folder is None:
-        output_folder = PAGES_FOLDER / space_key / page_id
+        pages_folder = get_pages_folder()
+        output_folder = pages_folder / space_key / page_id
     else:
         output_folder = Path(output_folder)
     

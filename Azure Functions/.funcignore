@@ -2,6 +2,7 @@
 .venv/
 venv/
 .env
+.env.template
 __pycache__/
 *.pyc
 *.pyo
@@ -12,6 +13,13 @@ data/
 # Ignore test files
 test_*.py
 tests/
+
+# Ignore non-function Python files
+streamlit_app.py
+main.py
+
+# Ignore disabled functions
+*_disabled/
 
 # Ignore IDE files
 .vscode/
