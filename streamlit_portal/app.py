@@ -87,13 +87,13 @@ COSMOS_KEY = st.secrets.get("COSMOS_KEY", os.getenv("COSMOS_KEY", ""))
 COSMOS_DATABASE = st.secrets.get("COSMOS_DATABASE", os.getenv("COSMOS_DATABASE", "confluence-digest"))
 COSMOS_CONTAINER = st.secrets.get("COSMOS_CONTAINER", os.getenv("COSMOS_CONTAINER", "subscriptions"))
 
-# DEBUG: Show what's being read (remove after debugging)
-if st.sidebar.checkbox("Show Debug Info", value=False):
-    st.sidebar.write(f"Endpoint: {COSMOS_ENDPOINT[:30]}..." if COSMOS_ENDPOINT else "Endpoint: NOT SET")
-    st.sidebar.write(f"Key starts with: {COSMOS_KEY[:10]}..." if COSMOS_KEY else "Key: NOT SET")
-    st.sidebar.write(f"Key length: {len(COSMOS_KEY)}" if COSMOS_KEY else "")
-    st.sidebar.write(f"Database: {COSMOS_DATABASE}")
-    st.sidebar.write(f"Container: {COSMOS_CONTAINER}")
+# DEBUG: Show what's being read (always visible for now)
+st.sidebar.markdown("### 🔧 Debug Info")
+st.sidebar.write(f"Endpoint: `{COSMOS_ENDPOINT[:30]}...`" if COSMOS_ENDPOINT else "❌ Endpoint: NOT SET")
+st.sidebar.write(f"Key starts with: `{COSMOS_KEY[:10]}...`" if COSMOS_KEY else "❌ Key: NOT SET")
+st.sidebar.write(f"Key length: `{len(COSMOS_KEY)}`" if COSMOS_KEY else "")
+st.sidebar.write(f"Database: `{COSMOS_DATABASE}`")
+st.sidebar.write(f"Container: `{COSMOS_CONTAINER}`")
 
 
 @st.cache_resource
