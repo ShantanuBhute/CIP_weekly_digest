@@ -6,9 +6,18 @@ A simple UI for managing email subscriptions to Confluence page updates
 import streamlit as st
 import os
 import sys
+import json
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Load settings from local.settings.json
+settings_path = os.path.join(os.path.dirname(__file__), "local.settings.json")
+if os.path.exists(settings_path):
+    with open(settings_path, "r") as f:
+        settings = json.load(f)
+        for key, value in settings.get("Values", {}).items():
+            os.environ.setdefault(key, value)
 
 from dotenv import load_dotenv
 load_dotenv()
