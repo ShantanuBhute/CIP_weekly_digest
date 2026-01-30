@@ -130,8 +130,11 @@ from single_page_monitor import detect_changes_optimized
 from confluence_content_extractor import extract_and_save_page
 from image_description_generator import describe_images_in_document
 from blob_storage_uploader import upload_page_to_blob
-from azure_search_indexer import create_search_index, index_single_page, delete_page_chunks
+from azure_search_indexer import create_search_index, index_single_page, delete_page_chunks, index_page_from_local
 from email_digest_generator import generate_page_summary_email
+
+# V2 Pipeline (optimized with caching)
+from v2_pipeline import V2Pipeline, run_v2_pipeline
 
 
 def print_banner(pages):
@@ -362,7 +365,12 @@ def process_single_page(page, force_reprocess=False, email_only=False):
 
 def run_pipeline(force_reprocess=False, email_only=False):
     """
-    Execute the complete pipeline for all configured pages.
+    Execute the complete V2 OPTIMIZED pipeline for all configured pages.
+    
+    V2 Optimizations:
+    - Image caching: Skip download if unchanged
+    - Description caching: Skip GPT-4o if image hash unchanged
+    - Upload deduplication: Skip upload if MD5 matches
     
     Args:
         force_reprocess: If True, run full pipeline even if no changes detected
@@ -376,24 +384,89 @@ def run_pipeline(force_reprocess=False, email_only=False):
     
     print_banner(pages)
     
+    print("\n🚀 RUNNING V2 OPTIMIZED PIPELINE")
+    print("   ✓ Image caching - skip download if unchanged")
+    print("   ✓ Description caching - skip GPT-4o if image unchanged")
+    print("   ✓ Upload deduplication - skip upload if hash matches")
+    print()
+    
     results = {
         'status': 'unknown',
+        'version': 'V2_OPTIMIZED',
         'started_at': datetime.utcnow().isoformat(),
         'pages_processed': [],
         'pages_changed': [],
         'steps_completed': [],
         'errors': [],
-        'email_files': []
+        'email_files': [],
+        'v2_stats': {}
     }
     
     try:
-        # Process each page
-        for page in pages:
-            page_result = process_single_page(page, force_reprocess, email_only)
-            results['pages_processed'].append(page_result)
+        # Ensure search index exists
+        try:
+            create_search_index()
+        except Exception as e:
+            print(f"   ⚠️ Search index warning (may already exist): {e}")
+        
+        if email_only:
+            # Email-only mode: Skip V2 pipeline, just generate emails
+            print("\n📧 EMAIL-ONLY MODE - Skipping content extraction...")
+            for page in pages:
+                page_result = {
+                    'page_id': page['page_id'],
+                    'page_title': page['title'],
+                    'space_key': page['space_key'],
+                    'has_changes': True,  # Force email generation
+                    'version': 1,
+                    'status': 'email_only'
+                }
+                results['pages_processed'].append(page_result)
+        else:
+            # Initialize V2 Pipeline with caching
+            pipeline = V2Pipeline()
             
-            if page_result['has_changes']:
-                results['pages_changed'].append(page_result['page_id'])
+            # Process each page through V2 pipeline
+            page_ids = [p['page_id'] for p in pages]
+            v2_result = pipeline.process_multiple_pages(page_ids, force=force_reprocess)
+            
+            # Convert V2 results to standard format
+            for pr in v2_result.get('results', []):
+                page_result = {
+                    'page_id': pr['page_id'],
+                    'page_title': pr.get('title', f"Page {pr['page_id']}"),
+                    'space_key': pr.get('space_key', SPACE_KEY),
+                    'has_changes': pr.get('has_changes', False),
+                    'version': pr.get('version', 1),
+                    'previous_version': pr.get('previous_version'),
+                    'change_summary': pr.get('change_summary', ''),
+                    'status': 'success' if pr.get('success') else 'error',
+                    'document_path': pr.get('document_path'),
+                    'errors': [pr.get('error')] if pr.get('error') else []
+                }
+                results['pages_processed'].append(page_result)
+                
+                if page_result['has_changes']:
+                    results['pages_changed'].append(page_result['page_id'])
+                    
+                    # Index to search after V2 pipeline
+                    if page_result.get('document_path'):
+                        try:
+                            print(f"\n📇 Indexing {page_result['page_id']} to Azure AI Search...")
+                            index_page_from_local(
+                                page_id=page_result['page_id'],
+                                document_json_path=page_result['document_path']
+                            )
+                            print(f"   ✅ Indexed successfully")
+                        except Exception as e:
+                            print(f"   ❌ Indexing failed: {e}")
+                            results['errors'].append(f"index_{page_result['page_id']}: {e}")
+            
+            # Store V2 optimization stats
+            results['v2_stats'] = v2_result.get('stats', {})
+            
+            # Print V2 summary
+            pipeline.print_summary()
         
         # Step 6: Generate emails (for all pages)
         email_results = step_6_generate_email(results['pages_processed'])
@@ -406,8 +479,9 @@ def run_pipeline(force_reprocess=False, email_only=False):
             results['errors'].append('generate_email')
         
         # Final status
-        all_success = all(p['status'] == 'success' for p in results['pages_processed'])
-        any_errors = any(p['errors'] for p in results['pages_processed']) or results['errors']
+        all_success = all(p.get('status') == 'success' or p.get('status') == 'email_only' 
+                        for p in results['pages_processed'])
+        any_errors = any(p.get('errors') for p in results['pages_processed']) or results['errors']
         
         if all_success and not any_errors:
             results['status'] = 'success'
@@ -419,25 +493,34 @@ def run_pipeline(force_reprocess=False, email_only=False):
     except Exception as e:
         results['status'] = 'failed'
         results['errors'].append(str(e))
+        import traceback
+        print(f"❌ Pipeline failed: {e}")
+        traceback.print_exc()
     
     results['completed_at'] = datetime.utcnow().isoformat()
     
     # Print summary
     print("\n")
     print("=" * 70)
-    print("PIPELINE COMPLETE")
+    print("V2 PIPELINE COMPLETE")
     print("=" * 70)
     print(f"   Status: {results['status'].upper()}")
     print(f"   Pages processed: {len(results['pages_processed'])}")
     print(f"   Pages changed: {len(results['pages_changed'])}")
     
+    if results['v2_stats']:
+        print(f"\n   🚀 V2 OPTIMIZATION SAVINGS:")
+        print(f"      Images from cache: {results['v2_stats'].get('images_cached', 0)}")
+        print(f"      Descriptions from cache: {results['v2_stats'].get('descriptions_cached', 0)}")
+        print(f"      Estimated cost saved: ${results['v2_stats'].get('estimated_cost_saved', 0):.2f}")
+    
     if results['email_files']:
-        print(f"   Emails generated: {len(results['email_files'])}")
+        print(f"\n   Emails generated: {len(results['email_files'])}")
         for ef in results['email_files']:
             print(f"     - {ef}")
     
     if results['errors']:
-        print(f"   Errors: {results['errors']}")
+        print(f"\n   ⚠️ Errors: {results['errors']}")
     
     print("=" * 70)
     
