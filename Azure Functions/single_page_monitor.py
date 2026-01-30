@@ -15,8 +15,9 @@ from azure.storage.blob import BlobServiceClient
 
 load_dotenv()
 
-# Target page configuration
-PAGE_ID = "164168599"
+# Target page configuration (for standalone testing only)
+# When used in pipeline, page_id is passed as parameter to detect_changes_optimized()
+PAGE_ID = os.getenv("TEST_PAGE_ID", "164168599")  # Default for testing
 PAGE_TITLE = "ProPM Roles & Responsibilities"
 SPACE_KEY = "CIPPMOPF"
 
@@ -353,6 +354,8 @@ def detect_changes_optimized(page_id):
 
 
 if __name__ == "__main__":
+    # Standalone testing mode - uses PAGE_ID defined above or TEST_PAGE_ID env var
+    # In production, detect_changes_optimized() is called with page_id parameter
     result = detect_changes_optimized(PAGE_ID)
     
     # Save result summary

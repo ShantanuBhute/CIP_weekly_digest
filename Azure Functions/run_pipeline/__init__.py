@@ -1,6 +1,11 @@
 """
 Manual Pipeline Trigger - HTTP Triggered Azure Function
 Allows manual execution of the pipeline via HTTP POST
+
+V2 OPTIMIZED VERSION:
+- Image caching (skip download if unchanged)
+- Description caching (skip GPT-4o if image hash unchanged)
+- Upload deduplication (skip upload if MD5 matches)
 """
 
 import os
@@ -14,12 +19,11 @@ from pathlib import Path
 # Add parent directory to path to import pipeline modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import pipeline modules directly
-from single_page_monitor import detect_changes_optimized
-from confluence_content_extractor import extract_and_save_page, get_data_folder
-from image_description_generator import describe_images_in_document
-from blob_storage_uploader import upload_page_to_blob
-from azure_search_indexer import create_search_index, index_single_page
+# V2 Pipeline (optimized with caching)
+from v2_pipeline import V2Pipeline, run_v2_pipeline
+
+# V1 modules still needed for email/search
+from azure_search_indexer import create_search_index, index_page_from_local
 from email_digest_generator import generate_page_summary_email
 from email_sender import notify_subscribers_for_page
 
@@ -47,77 +51,25 @@ def get_pages_config():
     return pages
 
 
-def process_single_page(page_config: dict, force_reprocess: bool = False) -> dict:
-    """Process a single page through the full pipeline"""
+def process_single_page_v2(page_config: dict, pipeline: V2Pipeline, force_reprocess: bool = False) -> dict:
+    """
+    Process a single page through the V2 OPTIMIZED pipeline.
+    
+    V2 Optimizations:
+    - Image caching: Skip download if unchanged
+    - Description caching: Skip GPT-4o if image hash unchanged  
+    - Upload deduplication: Skip upload if MD5 matches
+    """
     page_id = page_config['page_id']
     space_key = page_config.get('space_key', 'CIPPMOPF')
     
-    result = {
-        'page_id': page_id,
-        'space_key': space_key,
-        'has_changes': False,
-        'version': None,
-        'page_title': f"Page {page_id}",
-        'steps_completed': []
-    }
+    logger.info(f"[{page_id}] Starting V2 pipeline processing...")
     
-    try:
-        # Step 1: Check for changes
-        logger.info(f"[{page_id}] Step 1: Checking for changes...")
-        change_result = detect_changes_optimized(page_id)
-        result['has_changes'] = change_result.get('has_changes', False) or force_reprocess
-        result['version'] = change_result.get('version_number')  # Fixed: was 'current_version'
-        result['previous_version'] = change_result.get('previous_version')
-        # Fixed: detect_changes_optimized returns 'title', not 'page_title'
-        result['page_title'] = change_result.get('title', f"Page {page_id}")
-        # Store the detailed change summary from detection
-        result['change_summary'] = change_result.get('change_summary', '')
-        result['steps_completed'].append('change_detection')
-        
-        if not result['has_changes']:
-            logger.info(f"[{page_id}] No changes detected, skipping processing")
-            return result
-        
-        # Step 2: Extract content - extract_and_save_page auto-detects space from API
-        logger.info(f"[{page_id}] Step 2: Extracting content...")
-        extract_result = extract_and_save_page(page_id)
-        result['steps_completed'].append('content_extraction')
-        
-        # Get the document folder path (uses /tmp in Azure Functions)
-        data_folder = get_data_folder()
-        doc_folder = data_folder / "pages" / space_key / page_id
-        doc_json_path = doc_folder / "document.json"
-        
-        # Step 3: Process images
-        logger.info(f"[{page_id}] Step 3: Processing images...")
-        try:
-            describe_images_in_document(str(doc_json_path))
-            result['steps_completed'].append('image_processing')
-        except Exception as e:
-            logger.warning(f"[{page_id}] Image processing skipped: {e}")
-        
-        # Step 4: Upload to blob
-        logger.info(f"[{page_id}] Step 4: Uploading to blob storage...")
-        upload_page_to_blob(str(doc_folder))
-        result['steps_completed'].append('blob_upload')
-        
-        # Step 5: Index for search
-        logger.info(f"[{page_id}] Step 5: Indexing for search...")
-        try:
-            create_search_index()
-            index_single_page(page_id, space_key)
-            result['steps_completed'].append('search_indexing')
-        except Exception as e:
-            logger.warning(f"[{page_id}] Search indexing skipped: {e}")
-        
-        # Only set generic change summary if not already set from detection
-        if not result.get('change_summary'):
-            result['change_summary'] = f"Updated to version {result['version']}"
-        logger.info(f"[{page_id}] Processing complete!")
-        
-    except Exception as e:
-        logger.error(f"[{page_id}] Processing failed: {e}")
-        result['error'] = str(e)
+    # Use V2 pipeline
+    result = pipeline.process_page(page_id, force=force_reprocess)
+    
+    # Add space_key to result
+    result['space_key'] = space_key
     
     return result
 
@@ -126,13 +78,15 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     """
     HTTP-triggered function for manual pipeline execution.
     
+    V2 OPTIMIZED VERSION with caching!
+    
     Usage:
         POST /api/run_pipeline
         POST /api/run_pipeline?force=true  (force reprocessing)
         POST /api/run_pipeline?force_email=true  (force email even without changes)
         POST /api/run_pipeline?page_id=123456  (single page)
     """
-    logger.info('Manual pipeline trigger received')
+    logger.info('Manual pipeline trigger received (V2 OPTIMIZED)')
     
     try:
         # Parse parameters
@@ -160,17 +114,54 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json"
             )
         
-        # Process pages
+        # Initialize V2 Pipeline (with caching)
+        pipeline = V2Pipeline()
+        logger.info("V2 Pipeline initialized with caching enabled")
+        
+        # Ensure search index exists
+        try:
+            create_search_index()
+            logger.info("Search index ready")
+        except Exception as e:
+            logger.warning(f"Search index creation warning (may already exist): {e}")
+        
+        # Process pages using V2 pipeline
         results = []
         pages_changed = []
         
         for page in pages:
-            logger.info(f"Processing page: {page['page_id']}")
-            page_result = process_single_page(page, force_reprocess=force)
+            logger.info(f"Processing page: {page['page_id']} with V2 pipeline")
+            page_result = process_single_page_v2(page, pipeline, force_reprocess=force)
             results.append(page_result)
             
-            if page_result['has_changes']:
+            if page_result.get('has_changes'):
                 pages_changed.append(page_result['page_id'])
+                
+                # INDEX TO SEARCH after V2 pipeline extracts content
+                # This ensures email generator gets FRESH data from search index
+                try:
+                    logger.info(f"Indexing page {page_result['page_id']} to Azure AI Search...")
+                    doc_path = page_result.get('document_path')
+                    if doc_path:
+                        index_page_from_local(
+                            page_id=page_result['page_id'],
+                            document_json_path=doc_path
+                        )
+                        logger.info(f"✅ Page {page_result['page_id']} indexed to search")
+                    else:
+                        logger.warning(f"No document_path for {page_result['page_id']}, skipping search index")
+                except Exception as e:
+                    logger.error(f"Search indexing failed for {page_result['page_id']}: {e}")
+        
+        # Log V2 optimization stats
+        logger.info("=" * 60)
+        logger.info("V2 OPTIMIZATION STATS:")
+        logger.info(f"  Images downloaded: {pipeline.stats['images_downloaded']}")
+        logger.info(f"  Images from cache: {pipeline.stats['images_cached']}")
+        logger.info(f"  Descriptions generated: {pipeline.stats['descriptions_generated']}")
+        logger.info(f"  Descriptions from cache: {pipeline.stats['descriptions_cached']}")
+        logger.info(f"  Cost saved: ${pipeline.stats['estimated_cost_saved']:.2f}")
+        logger.info("=" * 60)
         
         # Generate emails and send to subscribers
         email_files = []
@@ -178,18 +169,18 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         for page_result in results:
             try:
                 # Only generate email if changes OR force_email
-                should_send = page_result['has_changes'] or force_email
+                should_send = page_result.get('has_changes') or force_email
                 
                 if not should_send:
-                    logger.info(f"No changes for {page_result['page_id']} - skipping email (use force_email=true to override)")
+                    logger.info(f"No changes for {page_result['page_id']} - skipping email")
                     continue
                 
                 logger.info(f"Generating email for {page_result['page_id']}...")
                 email_result = generate_page_summary_email(
                     page_id=page_result['page_id'],
-                    page_title=page_result['page_title'],
-                    version=page_result['version'],
-                    has_changes=page_result['has_changes'],
+                    page_title=page_result.get('title', f"Page {page_result['page_id']}"),
+                    version=page_result.get('version'),
+                    has_changes=page_result.get('has_changes'),
                     change_summary=page_result.get('change_summary', 'No changes'),
                     previous_version=page_result.get('previous_version')
                 )
@@ -203,21 +194,29 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                         space_key = page_result.get('space_key', 'CIPPMOPF')
                         send_result = notify_subscribers_for_page(
                             page_id=page_result['page_id'],
-                            email_subject=f"📄 Updates for {page_result['page_title']} from {space_key}",
+                            email_subject=f"Updates for {page_result.get('title', 'Page')} from {space_key}",
                             email_body=html_content
                         )
                         emails_sent += send_result.get('sent_count', 0)
-                        logger.info(f"Sent {send_result.get('sent_count', 0)} emails for {page_result['page_id']}")
+                        logger.info(f"Sent {send_result.get('sent_count', 0)} emails")
             except Exception as e:
                 logger.error(f"Email generation/sending failed for {page_result['page_id']}: {e}")
         
-        # Build response
+        # Build response with V2 stats
         response = {
             "status": "success",
+            "version": "V2_OPTIMIZED",
             "timestamp": datetime.utcnow().isoformat(),
             "pages_processed": len(results),
             "pages_changed": len(pages_changed),
             "changed_page_ids": pages_changed,
+            "v2_optimization_stats": {
+                "images_downloaded": pipeline.stats['images_downloaded'],
+                "images_from_cache": pipeline.stats['images_cached'],
+                "descriptions_generated": pipeline.stats['descriptions_generated'],
+                "descriptions_from_cache": pipeline.stats['descriptions_cached'],
+                "estimated_cost_saved": f"${pipeline.stats['estimated_cost_saved']:.2f}"
+            },
             "email_files": email_files,
             "emails_sent": emails_sent,
             "force_reprocess": force,
@@ -226,15 +225,16 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         }
         
         return func.HttpResponse(
-            json.dumps(response, indent=2),
+            json.dumps(response, indent=2, default=str),
             status_code=200,
             mimetype="application/json"
         )
         
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
+        import traceback
         return func.HttpResponse(
-            json.dumps({"error": str(e)}),
+            json.dumps({"error": str(e), "traceback": traceback.format_exc()}),
             status_code=500,
             mimetype="application/json"
         )

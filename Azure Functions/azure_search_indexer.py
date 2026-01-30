@@ -590,8 +590,93 @@ def find_blob_for_page(container_client, page_id, space_key):
         print(f"   📋 Found {len(matching_blobs)} versions, using latest: v{matching_blobs[0][0]}")
     
     return latest_blob
+
+
+def index_page_from_local(page_id: str, document_json_path: str, delete_existing: bool = True) -> int:
+    """
+    Index a page from local document.json file.
+    Used by V2 pipeline to index freshly extracted content.
     
-    return None
+    Args:
+        page_id: Confluence page ID
+        document_json_path: Path to local document.json file
+        delete_existing: If True, delete old chunks before indexing
+    
+    Returns:
+        Number of chunks indexed
+    """
+    print(f"\n📄 Indexing page {page_id} from local file...")
+    print(f"   📂 Source: {document_json_path}")
+    
+    # Verify file exists
+    if not os.path.exists(document_json_path):
+        print(f"   ❌ File not found: {document_json_path}")
+        return 0
+    
+    # Delete existing chunks first if requested
+    if delete_existing:
+        delete_page_chunks(page_id)
+    
+    # Connect to search service
+    credential = AzureKeyCredential(SEARCH_API_KEY)
+    search_client = SearchClient(
+        endpoint=SEARCH_ENDPOINT,
+        index_name=SEARCH_INDEX_NAME,
+        credential=credential,
+        connection_verify=False
+    )
+    
+    try:
+        # Read local document.json
+        with open(document_json_path, 'r', encoding='utf-8') as f:
+            document = json.load(f)
+        
+        # Chunk document
+        chunks = chunk_document(document)
+        
+        if chunks:
+            print(f"   ⬆️ Uploading {len(chunks)} chunks to index...")
+            
+            # Upload in batches with retry logic
+            batch_size = 50
+            total_indexed = 0
+            
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i:i + batch_size]
+                batch_num = i // batch_size + 1
+                
+                max_retries = 3
+                for retry in range(max_retries):
+                    try:
+                        result = search_client.upload_documents(documents=batch)
+                        total_indexed += len(result)
+                        print(f"      ✅ Batch {batch_num}: {len(result)} chunks uploaded")
+                        break
+                    except HttpResponseError as e:
+                        if e.status_code == 429 and retry < max_retries - 1:
+                            wait_time = 5 * (retry + 1)
+                            print(f"      ⏳ Rate limit on batch {batch_num}, waiting {wait_time}s...")
+                            time.sleep(wait_time)
+                        else:
+                            print(f"      ❌ Batch {batch_num} failed: {e}")
+                            break
+                    except Exception as e:
+                        print(f"      ❌ Batch {batch_num} error: {e}")
+                        break
+                
+                if i + batch_size < len(chunks):
+                    time.sleep(2)
+            
+            print(f"   ✅ Indexed {total_indexed} chunks for page {page_id}")
+            return total_indexed
+        
+        return 0
+        
+    except Exception as e:
+        print(f"   ❌ Error indexing page {page_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
 
 
 def index_single_page(page_id, space_key, delete_existing=True):

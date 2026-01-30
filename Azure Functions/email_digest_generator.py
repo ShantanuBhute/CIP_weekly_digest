@@ -44,7 +44,7 @@ openai_client = AzureOpenAI(
 # Azure AI Search configuration
 SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
-SEARCH_INDEX_NAME = "confluence-rag-index"
+SEARCH_INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX_NAME", "confluence-rag-index-v2")
 
 # Azure Blob Storage
 BLOB_ACCOUNT_NAME = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
