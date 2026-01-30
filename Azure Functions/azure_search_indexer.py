@@ -1,6 +1,7 @@
 """
 Azure AI Search Indexer - Programmatic Setup
 Reads from confluence-rag blob container and creates search index
+hello  hello
 """
 
 import os
